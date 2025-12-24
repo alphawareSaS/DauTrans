@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DauTrans Logistics Prototype</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    
+    <!-- React & React Router -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/history@5/umd/history.development.js"></script>
+    <script src="https://unpkg.com/react-router@6.3.0/umd/react-router.development.js"></script>
+    <script src="https://unpkg.com/react-router-dom@6.3.0/umd/react-router-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#136dec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                        "surface-dark": "#1c242e",
+                        "surface-light": "#ffffff",
+                        "border-light": "#e5e7eb",
+                        "border-dark": "#2d3748",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Shared Styles */
+        body {
+            min-height: 100vh;
+        }
+        .hide-scrollbar::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar, .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled, .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        @keyframes shimmer {
+            100% { transform: translateX(100%); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Destructuring required globals
+        const { useState, useEffect } = React;
+        const { createRoot } = ReactDOM;
+        const { MemoryRouter, Routes, Route, Link, useNavigate, useLocation } = ReactRouterDOM;
+
+        // --- COMPONENTS ---
+
+        // Reusable Bottom Navigation Component (Used in most authenticated screens)
+        const BottomNav = ({ active }) => {
+            const navigate = useNavigate();
+            
+            const navItems = [
+                { id: 'dashboard', icon: 'dashboard', label: 'Panel', path: '/dashboard' },
+                { id: 'loads', icon: 'local_shipping', label: 'Cargas', path: '/loads' },
+                { id: 'fleet', icon: 'list_alt', label: 'Flota', path: '/fleet' },
+                { id: 'profile', icon: 'person', label: 'Perfil', path: '/profile' },
+            ];
+
+            return (
+                <nav className="fixed bottom-0 left-0 w-full bg-surface-light dark:bg-background-dark border-t border-slate-200 dark:border-slate-800 pb-5 pt-3 z-40 shrink-0 max-w-full mx-auto">
+                    <div className="flex items-center justify-around">
+                        {navItems.map((item) => (
+                            <button 
+                                key={item.id}
+                                onClick={() => navigate(item.path)}
+                                className={`flex flex-col items-center justify-center gap-1 ${active === item.id ? 'text-primary' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                            >
+                                <span className={`material-symbols-outlined text-[24px] ${active === item.id ? 'filled' : ''}`}>{item.icon}</span>
+                                <span className="text-[10px] font-bold">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </nav>
+            );
+        };
+
+        // Screen 1: Login
+        const LoginScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden font-display">
+                    {/* Hero / Brand Section */}
+                    <div className="relative w-full h-64 bg-cover bg-center" style={{backgroundImage: 'linear-gradient(to bottom, rgba(16, 24, 34, 0.3), rgba(16, 24, 34, 1)), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCL4MBfU5LKMxT4Rqwq1nKWEyfhYN-XnRb2FdN5er7vZXJy6oOmcXhVPBQFBZfmuyb6h5VzbA2cp1qGCayj0443cXgJ-o7zvSBqpav9KEHQTzoR4V7BJPGfh4YBfd-wLDRNU9MDcoqB1qr04RDC_eMCxRzQ5Xu_zYJztCpKvSgcssMN4sVnrt2mRVKFcYnG-spzGNB3ZhWMMDRSWxFel3ynmDaUs6WjiGicRxWW-p4DkNfCT02soRTEtvUA53Y1wKCZ8OKssqYnRKCV")'}}>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
+                            <div className="flex items-center justify-center h-16 w-16 rounded-xl bg-primary shadow-lg shadow-blue-900/50 mb-4">
+                                <span className="material-symbols-outlined text-white text-[32px]">local_shipping</span>
+                            </div>
+                            <h2 className="text-white text-xl font-bold tracking-wide uppercase">DauTrans</h2>
+                        </div>
+                    </div>
+                    {/* Login Content */}
+                    <div className="flex flex-col items-center px-4 -mt-6 z-10 w-full max-w-[480px] mx-auto pb-10">
+                        <div className="w-full flex flex-col items-center mb-8">
+                            <h1 className="text-[#111418] dark:text-white tracking-tight text-[32px] font-bold leading-tight text-center pb-2">Welcome Back</h1>
+                            <p className="text-[#637588] dark:text-[#9da8b9] text-base font-normal leading-normal text-center">Log in to manage your shipments and cargo.</p>
+                        </div>
+                        <div className="w-full flex flex-col gap-4">
+                            <label className="flex flex-col min-w-40 flex-1">
+                                <p className="text-[#111418] dark:text-white text-base font-medium leading-normal pb-2">Email or Phone Number</p>
+                                <div className="flex w-full items-center rounded-lg border border-[#dce0e5] dark:border-[#3b4554] bg-white dark:bg-[#1c2027] focus-within:border-primary focus-within:ring-1 focus-within:ring-primary overflow-hidden">
+                                    <span className="pl-4 text-[#9da8b9] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-[20px]">mail</span>
+                                    </span>
+                                    <input className="form-input flex w-full min-w-0 flex-1 resize-none bg-transparent border-none text-[#111418] dark:text-white focus:outline-0 focus:ring-0 h-14 placeholder:text-[#9da8b9] p-[15px] text-base font-normal leading-normal" placeholder="user@dautrans.com" defaultValue="" />
+                                </div>
+                            </label>
+                            <label className="flex flex-col min-w-40 flex-1">
+                                <div className="flex justify-between items-baseline pb-2">
+                                    <p className="text-[#111418] dark:text-white text-base font-medium leading-normal">Password</p>
+                                </div>
+                                <div className="flex w-full flex-1 items-stretch rounded-lg border border-[#dce0e5] dark:border-[#3b4554] bg-white dark:bg-[#1c2027] focus-within:border-primary focus-within:ring-1 focus-within:ring-primary overflow-hidden">
+                                    <span className="pl-4 text-[#9da8b9] flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-[20px]">lock</span>
+                                    </span>
+                                    <input className="form-input flex w-full min-w-0 flex-1 resize-none bg-transparent border-none text-[#111418] dark:text-white focus:outline-0 focus:ring-0 h-14 placeholder:text-[#9da8b9] p-[15px] text-base font-normal leading-normal" placeholder="••••••••" type="password" defaultValue="" />
+                                    <div className="flex items-center justify-center pr-[15px] cursor-pointer text-[#9da8b9] hover:text-primary transition-colors">
+                                        <span className="material-symbols-outlined text-[24px]">visibility_off</span>
+                                    </div>
+                                </div>
+                            </label>
+                            <div className="flex w-full justify-end">
+                                <a className="text-sm font-semibold text-primary hover:text-blue-500 transition-colors" href="#">Forgot Password?</a>
+                            </div>
+                            <div className="pt-4">
+                                <button onClick={() => navigate('/dashboard')} className="w-full h-12 bg-primary hover:bg-blue-600 rounded-lg text-white text-base font-bold leading-normal transition-all shadow-md shadow-blue-500/20 active:scale-[0.98]">
+                                    Log In
+                                </button>
+                            </div>
+                            <div className="relative flex py-4 items-center">
+                                <div className="flex-grow border-t border-[#dce0e5] dark:border-[#3b4554]"></div>
+                                <span className="flex-shrink mx-4 text-[#637588] dark:text-[#9da8b9] text-sm">Or continue with</span>
+                                <div className="flex-grow border-t border-[#dce0e5] dark:border-[#3b4554]"></div>
+                            </div>
+                            <div className="flex gap-4 w-full">
+                                <button className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg border border-[#dce0e5] dark:border-[#3b4554] bg-white dark:bg-[#1c2027] hover:bg-gray-50 dark:hover:bg-[#252a33] transition-colors">
+                                    <span className="text-[#111418] dark:text-white font-medium">Google</span>
+                                </button>
+                                <button className="flex-1 h-12 flex items-center justify-center gap-2 rounded-lg border border-[#dce0e5] dark:border-[#3b4554] bg-white dark:bg-[#1c2027] hover:bg-gray-50 dark:hover:bg-[#252a33] transition-colors">
+                                    <span className="text-[#111418] dark:text-white font-medium">Apple</span>
+                                </button>
+                            </div>
+                            <div className="flex justify-center items-center pt-6">
+                                <p className="text-[#637588] dark:text-[#9da8b9] text-base font-normal">
+                                    Don't have an account? 
+                                    <a className="text-primary font-bold hover:text-blue-500 ml-1" href="#">Sign Up</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="h-10"></div>
+                </div>
+            );
+        };
+
+        // Screen 2: Dashboard (Operator Panel)
+        const DashboardScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden h-screen flex flex-col">
+                    <header className="flex items-center px-4 pt-6 pb-2 justify-between bg-surface-light dark:bg-background-dark z-20 shrink-0">
+                        <div className="flex flex-col">
+                            <h2 className="text-sm font-medium text-slate-500 dark:text-slate-400">Jueves, 24 Oct</h2>
+                            <h1 className="text-xl font-extrabold leading-tight tracking-[-0.015em] text-slate-900 dark:text-white">Hola, Carlos</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button className="flex items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-surface-dark text-slate-900 dark:text-white relative">
+                                <span className="material-symbols-outlined text-[24px]">notifications</span>
+                                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-surface-light dark:border-surface-dark"></span>
+                            </button>
+                            <Link to="/profile">
+                                <div className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-slate-100 dark:border-surface-dark" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA_M0QOeGC35BADbyBqUAHvr-znq7ugEB6BO52dnzB9ZjEDDhwJdMgpZ8BWDmb8m1IIXJyY3I1XOC-MMsNTTcvxgjbs-GnBVAtzXIP1PrE-2GBuRDbkJxs-HBT7gZM7p0HV_9ku82JTlFKNAUqb-68b-j9b0xoKvIeqvJQnYgn7QllTjrfFNKYd1i4j2cJ2v8L_A5NhmvMaw-4LxaeyFIW0Uwh1hk-LkdPpPUlMYxfOF1FtenUqE5A99RBVLRWwdmweIAtoCzDj0lx-')"}}></div>
+                            </Link>
+                        </div>
+                    </header>
+                    <main className="relative flex-1 w-full overflow-hidden flex flex-col">
+                        <div className="absolute top-0 left-0 right-0 z-10 px-4 py-3 overflow-x-auto no-scrollbar flex gap-2 w-full bg-gradient-to-b from-background-light/90 dark:from-background-dark/90 to-transparent pb-6">
+                            <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-slate-900 dark:bg-white pl-3 pr-4 shadow-lg">
+                                <span className="material-symbols-outlined text-[18px] text-white dark:text-background-dark">list</span>
+                                <span className="text-sm font-bold text-white dark:text-background-dark">Todos</span>
+                            </button>
+                            <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-surface-dark pl-3 pr-4 shadow-md border border-slate-200 dark:border-slate-700">
+                                <span className="material-symbols-outlined text-[18px] text-primary">local_shipping</span>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">En Ruta (12)</span>
+                            </button>
+                            <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-surface-dark pl-3 pr-4 shadow-md border border-slate-200 dark:border-slate-700">
+                                <span className="material-symbols-outlined text-[18px] text-amber-500">pause_circle</span>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">En Espera (4)</span>
+                            </button>
+                            <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-white dark:bg-surface-dark pl-3 pr-4 shadow-md border border-slate-200 dark:border-slate-700">
+                                <span className="material-symbols-outlined text-[18px] text-red-500">warning</span>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Alertas (2)</span>
+                            </button>
+                        </div>
+                        <div className="absolute inset-0 z-0 bg-slate-200 dark:bg-[#151c24] w-full h-full">
+                            <div className="w-full h-full bg-cover bg-center opacity-80 dark:opacity-60 grayscale-[20%] contrast-[1.1] brightness-[1.1] dark:invert-[.85] dark:hue-rotate-180" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuB53uRRRe-cmzCja3tDOmbm5OBMGe__9Gex_0rIItmo9ORql1crrOZl8m5Hz1AeLkys-A3heFt9pUM97Mxgmh3nDkcItMcuZQSJkpBs8vTeJSiAn_f9QMumQWHuwGifB0zebeMmuCzlC3OhsXByAcdj_9UfU6raWquNSbyAtgXRIKfNIM_swhBOADIfyO0PX9Qvi__STryx2NhkcfBzMEqJxgGxkl--KJ0PwkLwTozgwwkEdi2yQVgbHL70NpRVlqmZW9CVMyX1GR4m')", backgroundColor: "#cbd5e1"}}></div>
+                            
+                            {/* Map Markers */}
+                            <div onClick={() => navigate('/load-detail')} className="absolute top-[30%] left-[45%] flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-transform">
+                                <div className="bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg mb-1 whitespace-nowrap">DT-104</div>
+                                <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 animate-pulse">
+                                    <div className="w-4 h-4 rounded-full bg-primary shadow-[0_0_10px_rgba(19,109,236,0.6)] border-2 border-white dark:border-background-dark"></div>
+                                </div>
+                            </div>
+                            
+                            <div className="absolute top-[45%] left-[20%] flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-transform">
+                                <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg mb-1 whitespace-nowrap">ALERTA</div>
+                                <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-red-500/20">
+                                    <div className="w-4 h-4 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)] border-2 border-white dark:border-background-dark"></div>
+                                </div>
+                            </div>
+                            
+                            <div className="absolute top-[60%] left-[70%] flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-transform opacity-80">
+                                <div className="w-3 h-3 rounded-full bg-slate-400 border border-white dark:border-background-dark"></div>
+                            </div>
+                            
+                            <div className="absolute top-[25%] left-[65%] flex flex-col items-center group cursor-pointer transform hover:scale-110 transition-transform">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-800 dark:bg-white shadow-lg border-2 border-white dark:border-background-dark">
+                                    <span className="text-xs font-bold text-white dark:text-background-dark">5</span>
+                                </div>
+                            </div>
+                            
+                            <div className="absolute right-4 top-24 flex flex-col gap-2">
+                                <button className="flex w-10 h-10 items-center justify-center rounded-lg bg-white dark:bg-surface-dark shadow-lg text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">my_location</span>
+                                </button>
+                                <button className="flex w-10 h-10 items-center justify-center rounded-lg bg-white dark:bg-surface-dark shadow-lg text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                                    <span className="material-symbols-outlined text-[20px]">layers</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="absolute bottom-[45%] right-4 z-20">
+                            <button className="flex h-14 w-14 items-center justify-center rounded-full bg-primary shadow-[0_8px_16px_rgba(19,109,236,0.4)] text-white hover:bg-blue-600 transition-all active:scale-95">
+                                <span className="material-symbols-outlined text-[28px]">add</span>
+                            </button>
+                        </div>
+                        
+                        <div className="absolute bottom-0 left-0 w-full z-30 bg-white dark:bg-background-dark rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.2)] flex flex-col h-[40%] transition-all duration-300">
+                            <div className="w-full flex items-center justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
+                                <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-700"></div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto px-5 pb-20 pt-2">
+                                <div className="grid grid-cols-3 gap-3 mb-6">
+                                    <div className="bg-slate-50 dark:bg-surface-dark p-3 rounded-xl flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800">
+                                        <span className="text-2xl font-bold text-slate-900 dark:text-white">18</span>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Activos</span>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-surface-dark p-3 rounded-xl flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800">
+                                        <span className="text-2xl font-bold text-red-500">2</span>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Retrasos</span>
+                                    </div>
+                                    <div className="bg-slate-50 dark:bg-surface-dark p-3 rounded-xl flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800">
+                                        <span className="text-2xl font-bold text-green-500">98%</span>
+                                        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mt-1">Entrega</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Actividad Reciente</h3>
+                                    <button onClick={() => navigate('/trips')} className="text-primary text-sm font-semibold">Ver Todo</button>
+                                </div>
+                                <div className="flex flex-col gap-3">
+                                    <div onClick={() => navigate('/load-detail')} className="cursor-pointer flex items-center gap-4 bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-primary/20 flex items-center justify-center text-primary shrink-0">
+                                            <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">Unidad DT-405</h4>
+                                                <span className="text-xs font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">A tiempo</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">Llegó a Puerto Quetzal • 14:02 PM</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                        <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                                            <span className="material-symbols-outlined text-[20px]">warning</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">Unidad DT-102</h4>
+                                                <span className="text-xs font-medium text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">Detenido</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">Sin movimiento por 45 min • Ruta CA-9</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4 bg-white dark:bg-surface-dark p-3 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                        <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 shrink-0">
+                                            <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start">
+                                                <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">Entrega #8921</h4>
+                                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Finalizado</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">Entregado en Zona 12 • 13:45 PM</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                    <BottomNav active="dashboard" />
+                </div>
+            );
+        };
+
+        // Screen 3: Load Management (List of shipments)
+        const LoadManagementScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-display antialiased text-gray-900 dark:text-white min-h-screen pb-24">
+                    <header className="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-border-light dark:border-border-dark">
+                        <div className="flex items-center justify-between px-4 py-3">
+                            <button className="text-gray-900 dark:text-white flex items-center justify-center rounded-full w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                <span className="material-symbols-outlined">menu</span>
+                            </button>
+                            <h1 className="text-lg font-bold leading-tight tracking-tight">Gestión de Cargas</h1>
+                            <div className="flex items-center gap-2">
+                                <button className="text-gray-900 dark:text-white flex items-center justify-center rounded-full w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative">
+                                    <span className="material-symbols-outlined">notifications</span>
+                                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background-light dark:border-background-dark"></span>
+                                </button>
+                                <Link to="/profile">
+                                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-primary/30">
+                                        <img alt="Profile avatar" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4DXSG1k2iwyrGj5qkC1uvgcbpZZcGDz3xvUGtublVLoEEid_uGpWpkRtzB1wmn08Itr36s3TvPz1Z4DOHTTj7fh9Qxn8laldLnBvKFG35ZmIPEHjpmwR3so80b-2eO4PGyUpNuFVsqnAwE1HTGpzczXIkYFHG4HSRdNNolzWAutk7jNjcGcgoSAZ_yosZsOUxPsMPQCBmGWbiabIk3X_VFM_IbMacLiUY43PW3ugxFUM5XBuRnHz9TJXa0Xj7DBSJ42X7DmjSqV3S" />
+                                    </div>
+                                </Link>
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <div className="px-4 py-4">
+                        <label className="relative flex w-full flex-col">
+                            <div className="relative flex w-full items-stretch rounded-xl h-12 shadow-sm">
+                                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-gray-400">
+                                    <span className="material-symbols-outlined">search</span>
+                                </div>
+                                <input className="block w-full rounded-xl bg-surface-light dark:bg-surface-dark border-transparent focus:border-primary focus:ring-1 focus:ring-primary text-gray-900 dark:text-white placeholder-gray-400 pl-11 pr-4 text-base font-medium h-full shadow-sm" placeholder="Buscar ruta, cliente o ID..." defaultValue="" />
+                                <button className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                    <div className="bg-primary/10 dark:bg-gray-800 p-1.5 rounded-lg text-primary dark:text-gray-300">
+                                        <span className="material-symbols-outlined text-[20px]">tune</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <div className="px-4 pb-4">
+                        <div className="flex p-1 bg-gray-200 dark:bg-surface-dark rounded-xl relative">
+                            <div className="w-1/2 h-full absolute left-0 top-0 p-1 transition-all duration-300 ease-out transform translate-x-0">
+                                <div className="w-full h-full bg-white dark:bg-primary rounded-lg shadow-sm"></div>
+                            </div>
+                            <button className="flex-1 relative z-10 py-2 text-sm font-bold text-center rounded-lg text-gray-900 dark:text-white transition-colors">
+                                Disponibles
+                            </button>
+                            <button className="flex-1 relative z-10 py-2 text-sm font-medium text-center rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+                                En Tránsito
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-3 px-4 pb-4 overflow-x-auto hide-scrollbar">
+                        <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 pl-4 pr-3 shadow-sm active:scale-95 transition-transform">
+                            <p className="text-gray-700 dark:text-gray-200 text-sm font-medium">Fecha</p>
+                            <span className="material-symbols-outlined text-gray-500 text-[20px]">keyboard_arrow_down</span>
+                        </button>
+                        <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-primary text-white pl-4 pr-3 shadow-sm shadow-primary/20 active:scale-95 transition-transform">
+                            <p className="text-sm font-medium">Región</p>
+                            <span className="material-symbols-outlined text-white text-[20px]">close</span>
+                        </button>
+                        <button className="flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full bg-surface-light dark:bg-surface-dark border border-gray-200 dark:border-gray-700 pl-4 pr-3 shadow-sm active:scale-95 transition-transform">
+                            <p className="text-gray-700 dark:text-gray-200 text-sm font-medium">Peso</p>
+                            <span className="material-symbols-outlined text-gray-500 text-[20px]">keyboard_arrow_down</span>
+                        </button>
+                    </div>
+
+                    <div className="flex flex-col gap-4 px-4">
+                        {/* Card 1 */}
+                        <div onClick={() => navigate('/load-detail')} className="cursor-pointer bg-surface-light dark:bg-surface-dark rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:shadow-none border border-transparent dark:border-gray-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-xs font-semibold text-gray-400 tracking-wider">ID: #DT-8492</span>
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                    <span className="text-xs font-bold uppercase">Disponible</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 mb-5">
+                                <div className="flex flex-col items-center pt-1">
+                                    <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-primary/20"></div>
+                                    <div className="w-0.5 h-10 bg-gray-200 dark:bg-gray-700 my-1 border-l border-dashed border-gray-300 dark:border-gray-600"></div>
+                                    <div className="w-3 h-3 rounded-full border-2 border-gray-400 dark:border-gray-500 bg-transparent"></div>
+                                </div>
+                                <div className="flex flex-col justify-between h-full gap-3 flex-1">
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-none mb-1">Origen</p>
+                                        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">Puerto Quetzal, Escuintla</h3>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-none mb-1">Destino</p>
+                                        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">Zona 12, Cd. de Guatemala</h3>
+                                    </div>
+                                </div>
+                                <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 relative">
+                                    <img alt="Map" className="w-full h-full object-cover opacity-80 mix-blend-overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbC4uRdLrw-SPhyUbl-j2T_2zjAsc52HMAIeylXxujheosOb92AO_9SvEpm3lKmMKc0nfFjhj5RIgimYVOKKmyMZMxmGLK560FyytU7rqpwr_H1TA-sB_ETMaWPoGqF7-YfeTS9z3fDyUDZutVAxDbS0qHPtovU55SdHWbBm-HcfSOTbAMwA4WtNxHBA88WLmIZqkCAYPeIVejDQanFO_sJsBvirivTBED-2tOSMpeZ4EkStjeos66x1-e6Sr_9dfm_90iogNrY4Jr" />
+                                    <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-primary text-xl">map</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-4"></div>
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                        <span className="material-symbols-outlined text-[18px] text-gray-400">inventory_2</span>
+                                        <span>Acero Industrial • 25 Ton</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                        <span className="material-symbols-outlined text-[18px] text-gray-400">calendar_today</span>
+                                        <span>Hoy, 14:00 PM</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="text-lg font-extrabold text-primary">Q. 3,500</span>
+                                    <button onClick={(e) => { e.stopPropagation(); navigate('/load-detail'); }} className="bg-primary hover:bg-blue-600 text-white text-sm font-bold py-1.5 px-4 rounded-lg transition-colors shadow-lg shadow-primary/25">
+                                        Ver Detalles
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                         {/* Card 2 */}
+                        <div className="bg-surface-light dark:bg-surface-dark rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.05)] dark:shadow-none border border-transparent dark:border-gray-800">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-xs font-semibold text-gray-400 tracking-wider">ID: #DT-8501</span>
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                    <span className="text-xs font-bold uppercase">Disponible</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 mb-5">
+                                <div className="flex flex-col items-center pt-1">
+                                    <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-primary/20"></div>
+                                    <div className="w-0.5 h-10 bg-gray-200 dark:bg-gray-700 my-1 border-l border-dashed border-gray-300 dark:border-gray-600"></div>
+                                    <div className="w-3 h-3 rounded-full border-2 border-gray-400 dark:border-gray-500 bg-transparent"></div>
+                                </div>
+                                <div className="flex flex-col justify-between h-full gap-3 flex-1">
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-none mb-1">Origen</p>
+                                        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">Tecún Umán, San Marcos</h3>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-none mb-1">Destino</p>
+                                        <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">Escuintla, Cabecera</h3>
+                                    </div>
+                                </div>
+                                <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0 relative">
+                                    <img alt="Map" className="w-full h-full object-cover opacity-80 mix-blend-overlay" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHRkmb5WfkS0S6XPZPXHa358LjyXpuCcs6h8ofte6gArTesY1_oQnV_pNlWMLo1Ly16MHp0cgH7EXSCVN5Sby0Ao98X11-BJiOIYfBuoBV08b0GQrKH88KNN7SlfbWVx8mMsftf48hRpoRfalFiHczGd1m00Yd2m0KxeeFITjt0oYfGBIckeiV8L4axd2v7U2IkD_zfhbj600TOmOA_FcZd-Z4lcsuP7U2TPJJu5rCpPBwM0CvWraLHUGjAO2kFPnJVrHweEpU288B" />
+                                </div>
+                            </div>
+                            <div className="h-px bg-gray-100 dark:bg-gray-800 w-full mb-4"></div>
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                        <span className="material-symbols-outlined text-[18px] text-gray-400">agriculture</span>
+                                        <span>Maquinaria • 12 Ton</span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="text-lg font-extrabold text-primary">Q. 5,200</span>
+                                    <button className="bg-primary hover:bg-blue-600 text-white text-sm font-bold py-1.5 px-4 rounded-lg transition-colors shadow-lg shadow-primary/25">Ver Detalles</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="fixed bottom-24 right-4 z-40">
+                        <button className="flex items-center justify-center w-14 h-14 bg-primary text-white rounded-full shadow-[0_4px_12px_rgba(19,109,236,0.4)] hover:scale-105 active:scale-95 transition-all">
+                            <span className="material-symbols-outlined text-[28px]">add</span>
+                        </button>
+                    </div>
+
+                    <BottomNav active="loads" />
+                </div>
+            );
+        };
+
+        // Screen 4: Load Detail
+        const LoadDetailScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-white selection:bg-primary/30 selection:text-primary min-h-screen">
+                    <div className="relative flex flex-col min-h-screen w-full max-w-md mx-auto overflow-x-hidden shadow-2xl pb-24 bg-background-light dark:bg-background-dark border-x border-slate-200 dark:border-slate-800">
+                        <div className="sticky top-0 z-40 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 h-16 flex items-center justify-between transition-colors duration-200">
+                            <button onClick={() => navigate(-1)} className="w-10 h-10 flex items-center justify-center -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-slate-900 dark:text-white">
+                                <span className="material-symbols-outlined">arrow_back</span>
+                            </button>
+                            <h1 className="text-lg font-bold tracking-tight">Detalle de Carga</h1>
+                            <button className="w-10 h-10 flex items-center justify-center -mr-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors text-slate-900 dark:text-white">
+                                <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                        </div>
+
+                        <div className="relative w-full h-64 bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div className="absolute inset-0 bg-cover bg-center opacity-90 dark:opacity-80 transition-opacity" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuB53uRRRe-cmzCja3tDOmbm5OBMGe__9Gex_0rIItmo9ORql1crrOZl8m5Hz1AeLkys-A3heFt9pUM97Mxgmh3nDkcItMcuZQSJkpBs8vTeJSiAn_f9QMumQWHuwGifB0zebeMmuCzlC3OhsXByAcdj_9UfU6raWquNSbyAtgXRIKfNIM_swhBOADIfyO0PX9Qvi__STryx2NhkcfBzMEqJxgGxkl--KJ0PwkLwTozgwwkEdi2yQVgbHL70NpRVlqmZW9CVMyX1GR4m')"}}>
+                                <div className="absolute inset-0 bg-gradient-to-t from-background-light/20 via-transparent to-transparent dark:from-background-dark/40"></div>
+                            </div>
+                            <div className="absolute top-4 right-4 bg-white/90 dark:bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                </span>
+                                <span className="text-xs font-bold text-slate-700 dark:text-white uppercase tracking-wider">GPS Activo</span>
+                            </div>
+                        </div>
+
+                        <div className="px-4 -mt-16 relative z-10">
+                            <div className="bg-surface-light dark:bg-surface-dark rounded-xl p-5 shadow-lg border border-slate-100 dark:border-slate-700/50">
+                                <div className="flex justify-between items-end mb-3">
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Estado Actual</p>
+                                        <h2 className="text-xl font-bold text-primary flex items-center gap-2">En Tránsito</h2>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white">14:30</p>
+                                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">ETA Estimado</p>
+                                    </div>
+                                </div>
+                                <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div className="h-full bg-primary w-[65%] rounded-full relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] -skew-x-12 translate-x-[-100%]"></div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between mt-2 text-[10px] font-medium text-slate-400 uppercase">
+                                    <span>Recolectado</span>
+                                    <span>En Ruta</span>
+                                    <span>Entregado</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-4 pt-6 pb-2">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">route</span>
+                                Ruta
+                            </h3>
+                            <div className="relative pl-3">
+                                <div className="absolute left-[19px] top-[28px] bottom-[36px] w-[2px] bg-slate-200 dark:bg-slate-700"></div>
+                                <div className="flex gap-4 mb-6 relative group">
+                                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 flex items-center justify-center shrink-0 z-10 group-hover:border-primary transition-colors">
+                                        <span className="material-symbols-outlined text-slate-500 dark:text-slate-400 text-[20px]">trip_origin</span>
+                                    </div>
+                                    <div className="py-1">
+                                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-0.5">Recogida • 08:00 AM</p>
+                                        <p className="text-base font-bold text-slate-900 dark:text-white leading-tight">Zona 12</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Ciudad de Guatemala, Guatemala</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 relative group">
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 dark:bg-primary/20 border-2 border-primary flex items-center justify-center shrink-0 z-10 shadow-[0_0_10px_rgba(19,109,236,0.3)]">
+                                        <span className="material-symbols-outlined text-primary text-[20px]">location_on</span>
+                                    </div>
+                                    <div className="py-1">
+                                        <p className="text-xs font-semibold text-primary uppercase mb-0.5">Destino Final</p>
+                                        <p className="text-base font-bold text-slate-900 dark:text-white leading-tight">Puerto Quetzal</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Escuintla, Guatemala</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mx-4 my-6 h-px bg-slate-200 dark:bg-slate-800"></div>
+
+                        <div className="px-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">inventory_2</span>
+                                Información de Carga
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                                    <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-2xl">weight</span>
+                                    <div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Peso Total</p>
+                                        <p className="font-bold text-base text-slate-900 dark:text-white">24 Ton</p>
+                                    </div>
+                                </div>
+                                <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                                    <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-2xl">category</span>
+                                    <div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Tipo</p>
+                                        <p className="font-bold text-base text-slate-900 dark:text-white truncate">Materia Prima</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mx-4 my-6 h-px bg-slate-200 dark:bg-slate-800"></div>
+
+                        <div className="px-4 mb-8">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Conductor Asignado</h3>
+                            <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <div className="w-12 h-12 rounded-full bg-slate-300 bg-cover bg-center ring-2 ring-slate-100 dark:ring-slate-700" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAqJpnviQEhYTNy3x1O7lXxb_pyYpakqx_hZiDRRveU5qoJ2wWGTdDLjFFY89W7LGPt8Y60PHfHByv5Y_lmWRJEsvgF6UHq7xVZWcXyNc5oH1pb03C6WQC9EJBJQrut0Sqtz3i2OL6Zz66zdMfi0G3hyfeDfHmAbjN3xjRC6WqO5luw1G0YRrZ0LEcrKJZ7Z5JJFZ6MRYNxRUvVMQsOvFQauVU92wayK95V2TpVn5r5X3_OgiHU7XR7Hvse2g0T6ERjZLYUW0jlbnC_')"}}></div>
+                                        <div className="absolute -bottom-1 -right-1 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-background-dark">4.8</div>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-900 dark:text-white text-base">Juan Pérez</h4>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">C-123XYZ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onClick={() => navigate('/chat')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700">
+                                    <span className="material-symbols-outlined text-[20px]">chat</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 max-w-md mx-auto">
+                            <button onClick={() => navigate('/chat')} className="w-full bg-primary hover:bg-blue-600 active:bg-blue-700 text-white font-bold h-12 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary/20">
+                                <span className="material-symbols-outlined text-[20px]">chat</span>
+                                Chat con Conductor
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Screen 5: My Trips
+        const MyTripsScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark border-x border-slate-200 dark:border-slate-800 pb-20">
+                    <header className="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center p-4 justify-between">
+                            <button onClick={() => navigate(-1)} className="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                                <span className="material-symbols-outlined text-2xl">arrow_back</span>
+                            </button>
+                            <h2 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Mis Viajes</h2>
+                            <div className="flex size-10 items-center justify-end">
+                                <button className="flex items-center justify-center rounded-full size-10 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white hover:opacity-80 transition-opacity">
+                                    <span className="material-symbols-outlined text-2xl">account_circle</span>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="flex-1 flex flex-col gap-4 p-4 pb-24">
+                        <div className="flex flex-col rounded-xl overflow-hidden shadow-lg bg-white dark:bg-[#1c2027] border border-slate-200 dark:border-slate-800">
+                            <div className="relative h-40 w-full bg-slate-200 dark:bg-slate-800">
+                                <div className="absolute inset-0 bg-center bg-cover opacity-80" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAptwg0ywuSP4wjgwIWkn8PuTzqdTn5hLKztFcdeIQ9t2swLQdUZn3BFh76oHldXEPNzykf7Qevbt3Vm0z6kHuRx31u-iZv3Q2Onf1hX9Vu7bSCB3E6wJWAFU5UccSJc5L1dlNNFea1yuB6oLxEcUEEeLyd1L29z5IxNu6yKYncxsN14B4WnzHTOKRSO72MUz06cI3gB8Ja8QubUn4EJhxm9MJg2u6wQXJfkWpgDMAGQlhx4woIydgFWbNdgZ8tSV1Xdzeii753JANe")'}}></div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#1c2027] to-transparent"></div>
+                                <div className="absolute top-3 left-3 bg-primary text-white text-xs font-bold px-2 py-1 rounded shadow-md uppercase tracking-wide">En Curso</div>
+                                <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/10">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    <span className="text-white text-xs font-medium">GPS Activo</span>
+                                </div>
+                            </div>
+                            <div className="p-5 flex flex-col gap-4">
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-slate-500 dark:text-[#9da8b9] text-xs font-medium uppercase tracking-wider">Destino Final</p>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-slate-900 dark:text-white text-2xl font-bold leading-tight">Puerto Quetzal</h3>
+                                        <span className="material-symbols-outlined text-slate-400 dark:text-slate-600">arrow_forward</span>
+                                    </div>
+                                    <p className="text-slate-500 dark:text-slate-400 text-sm">Desde: Guatemala City (Zona 12)</p>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-primary font-bold text-sm">En Ruta a Aduana</span>
+                                        <span className="text-slate-500 dark:text-slate-400 text-xs">ETA: 14:30</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-primary w-[65%] rounded-full relative">
+                                            <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/30 animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 mt-1">
+                                    <button className="flex-1 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-all text-white font-bold h-12 rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                                        <span className="material-symbols-outlined">update</span>
+                                        Actualizar Estado
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                    <BottomNav active="loads" />
+                </div>
+            );
+        };
+
+        // Screen 6: Chat
+        const ChatScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased overflow-hidden">
+                    <div className="relative flex flex-col h-screen w-full max-w-lg mx-auto bg-background-light dark:bg-background-dark shadow-2xl">
+                        <div className="shrink-0 z-20 flex items-center justify-between px-4 py-3 bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                                    <span className="material-symbols-outlined">arrow_back</span>
+                                </button>
+                                <div className="relative">
+                                    <div className="bg-center bg-no-repeat bg-cover rounded-full size-10 border border-gray-200 dark:border-gray-700" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBf58aGqIPt9jrg76xaZ75h-X939idVYLLSoKnCj2UeGhuP9BUEQRmMsAuVqlwTNBXc-58t5iGOJpSbc_HiXq6fO5JScQpLhjtgr74xIEF12BLttSUs3RAgBxdFNcpbYfzUG8_iLehxEy95X8TCgSffxSV45SeScRxzFrz_vjLbYL0SXK-PZ1nTfCumOS1La0cS02PjM96_hf4Rmd_1J_Xvn-xSphMxIyZFayMqV-6dWQgZPicqD1_siW-eyTlQ6SCJ-oP4BMdiUzhz")'}}></div>
+                                    <span className="absolute bottom-0 right-0 size-3 bg-green-500 border-2 border-surface-light dark:border-surface-dark rounded-full"></span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <h2 className="text-base font-bold leading-tight text-slate-900 dark:text-white">Juan Pérez</h2>
+                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Placa C-123BTN</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button className="flex items-center justify-center size-10 rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors">
+                                    <span className="material-symbols-outlined" style={{fontSize: "20px"}}>call</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 relative">
+                             <div className="sticky top-0 z-10 -mx-2 px-2 pb-2">
+                                <div className="backdrop-blur-md bg-surface-light/90 dark:bg-surface-dark/90 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-1.5 py-0.5 rounded">Carga #9021</span>
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">Acero Industrial</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                            <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+                                            <span className="truncate">En tránsito • GT City a Escuintla</span>
+                                        </div>
+                                    </div>
+                                    <div className="size-12 shrink-0 rounded-lg bg-cover bg-center bg-no-repeat overflow-hidden relative" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAyUdEFXghilCm0cHiBLWjGttvYKq3Rpi3-0df9hwPOgM5Qne5_2ig1hmj7nWNR3-kaUiRUIp7J55f8moVZf11RL2x1XC-_JXKUksIrwfPdXyFY_o__bWYgXxXfIFjjiwWr2ftJILYGX2MF8QbFMvm4Q9FfLLXj1chEsOevymi4sTGlP2iJincdnFk-ihz6LSaTrqtJfCC0XS4UTklNgvZvORDOdrPhaI2RZiNPx8avToKfDPH-lXybclui8RSYTOXxxXqceX8oHa87")'}}></div>
+                                </div>
+                            </div>
+                            <div className="flex justify-center my-2">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 bg-gray-100 dark:bg-gray-800/50 px-3 py-1 rounded-full uppercase tracking-wide">Hoy</span>
+                            </div>
+                            <div className="flex items-end gap-2 justify-end">
+                                <div className="flex flex-col gap-1 items-end max-w-[80%]">
+                                    <div className="bg-primary text-white px-4 py-3 rounded-2xl rounded-tr-none shadow-md">
+                                        <p className="text-sm leading-relaxed">Buenos días, Juan. ¿Ya cargaste el material en la planta?</p>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium pr-1">10:15 AM</p>
+                                </div>
+                            </div>
+                            <div className="flex items-end gap-2 justify-start">
+                                <div className="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 mb-5" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuC-DfGLTfOCZPwME76B4b6T1hjog5EIPYyaKf7nVeZspJhUMt5QlRbm8yF5p-pkyszdzsLMDWT5MTrJXk6KyYdKoRVYYdV6KzvFIm4Bk6EYCPVCp6Cv54rR0NWiuaPOghTNqbGRMFr4SrdDlAZ48UqRFkC_Cxf-ciGFPTHiUdcYyBFRn7zEaqw7h3RP1XLhn-MDE1JTscvBDnQNdgVfOpriAogfDclnt-b7aUQiRnE2Ql2cG5ncfv80ZzHguOAwPlIzaS6mU6PZm9Tc")'}}></div>
+                                <div className="flex flex-col gap-1 items-start max-w-[80%]">
+                                    <div className="bg-gray-100 dark:bg-surface-dark text-slate-800 dark:text-gray-100 px-4 py-3 rounded-2xl rounded-tl-none border border-gray-200 dark:border-gray-700 shadow-sm">
+                                        <p className="text-sm leading-relaxed">Sí jefe, saliendo de la planta ahora mismo. Todo en orden.</p>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium pl-1">10:18 AM</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="shrink-0 p-3 pb-6 sm:pb-3 bg-surface-light dark:bg-surface-dark border-t border-gray-200 dark:border-gray-800">
+                            <div className="flex items-end gap-2">
+                                <div className="flex-1 bg-gray-100 dark:bg-background-dark rounded-2xl flex items-center min-h-[48px] border border-transparent focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                                    <textarea className="w-full bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:ring-0 px-4 py-3 resize-none max-h-24" placeholder="Escribe un mensaje..." rows="1" style={{minHeight: "48px", lineHeight: "24px"}}></textarea>
+                                </div>
+                                <button className="shrink-0 size-10 flex items-center justify-center rounded-full bg-primary hover:bg-blue-600 text-white shadow-lg shadow-primary/30 transition-all active:scale-95">
+                                    <span className="material-symbols-outlined filled">send</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Screen 7: Fleet Management
+        const FleetScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-white overflow-x-hidden antialiased pb-24 min-h-screen">
+                    <header className="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+                        <div className="flex items-center justify-between px-4 py-4">
+                            <h1 className="text-2xl font-extrabold tracking-tight">Gestión de Flota</h1>
+                            <button className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg shadow-primary/30 hover:bg-primary/90 transition-colors">
+                                <span className="material-symbols-outlined">add</span>
+                            </button>
+                        </div>
+                    </header>
+                    <section className="p-4">
+                        <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
+                            <div className="min-w-[140px] flex-1 flex flex-col gap-3 rounded-xl p-5 bg-white dark:bg-[#1c2027] border border-gray-100 dark:border-gray-800 shadow-sm">
+                                <div className="flex items-center gap-2 text-primary">
+                                    <span className="material-symbols-outlined text-[20px]">local_shipping</span>
+                                    <p className="text-sm font-semibold">Total</p>
+                                </div>
+                                <p className="text-3xl font-bold tracking-tight">12</p>
+                            </div>
+                            <div className="min-w-[140px] flex-1 flex flex-col gap-3 rounded-xl p-5 bg-white dark:bg-[#1c2027] border border-gray-100 dark:border-gray-800 shadow-sm">
+                                <div className="flex items-center gap-2 text-emerald-500">
+                                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                                    <p className="text-sm font-semibold">Libres</p>
+                                </div>
+                                <p className="text-3xl font-bold tracking-tight">5</p>
+                            </div>
+                        </div>
+                    </section>
+                    <main className="flex flex-col gap-4 p-4">
+                        <div className="group relative flex flex-col rounded-xl bg-white dark:bg-[#1c2027] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden transition-all hover:shadow-md">
+                            <div className="flex items-stretch">
+                                <div className="w-1/3 bg-gray-200 dark:bg-gray-800 relative">
+                                    <div className="absolute inset-0 bg-cover bg-center" style={{backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuA7gRND78mkgaTuDjXLvkJvwmb0G2GUX_mLOSIvH7pRXLyY507UFQRSQYmAconKDzgsn6kqnegaVgg8e2KDk9QUyLUKxTLzRyiEr9RD5TaYPI3j_cG7WofUwd5EMo7nwS7CT9FzCfR6JmkHWl6GLoG5k4Xs-ZoX013WG1bS4CkiBXIbH4hGEp8Uf0A_iewJZJ2lATcPeEeMKCoDlKxTldVsYM-ZAc77ptSXuk6JwIhAlFhF2HK0EHvQcGkaKx9Jm6lej4PiL3mQB2ZT')"}}></div>
+                                </div>
+                                <div className="flex-1 p-4 flex flex-col justify-between gap-3">
+                                    <div>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                En Ruta
+                                            </span>
+                                            <span className="text-xs font-medium text-gray-400">ID: #TR-01</span>
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">International ProStar</h3>
+                                        <p className="text-primary font-bold text-sm mt-0.5">C-992BBB</p>
+                                    </div>
+                                    <div className="pt-3 mt-1 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
+                                            <span className="material-symbols-outlined text-[16px]">location_on</span>
+                                            <span className="truncate max-w-[120px]">Puerto Quetzal</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                    <BottomNav active="fleet" />
+                </div>
+            );
+        };
+
+        // Screen 8: Profile
+        const ProfileScreen = () => {
+            const navigate = useNavigate();
+
+            return (
+                <div className="relative flex h-full min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-x-hidden">
+                    <header className="flex items-center justify-between p-4 sticky top-0 z-20 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
+                        <div onClick={() => navigate(-1)} className="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                            <span className="material-symbols-outlined">arrow_back</span>
+                        </div>
+                        <h2 className="text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Perfil del Conductor</h2>
+                        <div className="flex w-10 items-center justify-end">
+                            <span className="material-symbols-outlined text-slate-500 dark:text-slate-400 cursor-pointer">settings</span>
+                        </div>
+                    </header>
+                    <div className="flex flex-col items-center p-6 pb-2">
+                        <div className="relative mb-4 group cursor-pointer">
+                            <div className="bg-center bg-no-repeat bg-cover rounded-full h-32 w-32 shadow-lg ring-4 ring-surface-light dark:ring-surface-dark" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCVBLZN795rv_iVq_NMtFZqxXyBfg32eORSUFCjNLxWic7NGmDYvBK_JcHaCTSYYDWtaW0ivX3YhrYcJGWIhRGQPhFo-OMq71l_9lN7iFRB6VR3kpSBT6Xeabry1eWMD078xyA1DdhOZnrLD8-8ZcIhGTG4314CDq1ix4naUjI7u3XNP0UAoHYWp80rVEOUuBMiFM1qAYmaZl-gAhLC-pvhuUobI3_ff3yHJRiP5ofTTKXsclEMaC-MNJTF7qEytMzLtPnuKtH8Yaov")'}}></div>
+                            <div className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1.5 flex items-center justify-center border-2 border-background-light dark:border-background-dark">
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center justify-center gap-1">
+                            <h1 className="text-2xl font-bold leading-tight">Juan Pérez</h1>
+                            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm font-medium">
+                                <span className="bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-700 dark:text-slate-300">Placa: P-123XYZ</span>
+                                <span className="flex items-center text-amber-500"><span className="material-symbols-outlined text-[18px] mr-0.5 filled">star</span> 4.8</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="px-4 pt-4 pb-2">
+                        <div className="flex items-center justify-center w-full bg-slate-200 dark:bg-surface-dark rounded-lg p-1">
+                            <button className="flex-1 py-2 rounded-md bg-primary text-white font-bold text-sm shadow-sm">Disponible</button>
+                            <button className="flex-1 py-2 rounded-md text-slate-500 dark:text-slate-400 font-bold text-sm">Fuera de Servicio</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 px-4 py-4">
+                        <div className="flex flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800/50 items-center text-center">
+                            <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center text-primary mb-1">
+                                <span className="material-symbols-outlined text-[20px]">vertical_align_top</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Altura</p>
+                            <p className="text-slate-900 dark:text-white text-xl font-bold">4.2m</p>
+                        </div>
+                        <div className="flex flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800/50 items-center text-center">
+                            <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center text-primary mb-1">
+                                <span className="material-symbols-outlined text-[20px]">width</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Ancho</p>
+                            <p className="text-slate-900 dark:text-white text-xl font-bold">2.6m</p>
+                        </div>
+                        <div className="flex flex-col gap-1 rounded-xl p-4 bg-white dark:bg-surface-dark shadow-sm border border-slate-100 dark:border-slate-800/50 items-center text-center">
+                            <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center text-primary mb-1">
+                                <span className="material-symbols-outlined text-[20px]">weight</span>
+                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Peso Max</p>
+                            <p className="text-slate-900 dark:text-white text-xl font-bold">20T</p>
+                        </div>
+                    </div>
+
+                    <div className="px-4 pb-20">
+                         <button onClick={() => navigate('/')} className="mt-6 w-full py-3 rounded-lg border border-red-500/30 text-red-500 font-bold hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2">
+                            <span className="material-symbols-outlined">logout</span>
+                            Cerrar Sesión
+                        </button>
+                    </div>
+
+                    <BottomNav active="profile" />
+                </div>
+            );
+        };
+
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            return (
+                <MemoryRouter>
+                    <Routes>
+                        <Route path="/" element={<LoginScreen />} />
+                        <Route path="/dashboard" element={<DashboardScreen />} />
+                        <Route path="/loads" element={<LoadManagementScreen />} />
+                        <Route path="/load-detail" element={<LoadDetailScreen />} />
+                        <Route path="/trips" element={<MyTripsScreen />} />
+                        <Route path="/chat" element={<ChatScreen />} />
+                        <Route path="/fleet" element={<FleetScreen />} />
+                        <Route path="/profile" element={<ProfileScreen />} />
+                    </Routes>
+                </MemoryRouter>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
